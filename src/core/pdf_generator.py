@@ -1,11 +1,17 @@
 """
-PDF Generator - Handles PDF generation with modern two-column layout
+Generatore PDF - Gestisce la creazione di PDF con layout moderno a due colonne
 
-This module provides the PDFGenerator class which creates professional invoices with:
-- Two-column header design
-- Logo support
-- Modern spacing and typography
-- Clear section separation
+Questo modulo fornisce la classe PDFGenerator che crea ricevute professionali con:
+- Design moderno a due colonne per l'intestazione
+- Supporto per il logo aziendale
+- Spaziatura e tipografia moderne
+- Chiara separazione delle sezioni
+
+Possibili miglioramenti:
+- Aggiungere più template tra cui scegliere
+- Implementare la personalizzazione dei colori
+- Aggiungere codici QR per pagamenti
+- Supportare firme digitali
 """
 import json
 from pathlib import Path
@@ -21,9 +27,26 @@ from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 from ..models.invoice import Invoice
 
 class PDFGenerator:
-    """Generates PDF invoices with modern layout"""
+    """Genera PDF delle ricevute con layout moderno"""
     
     def __init__(self, config_dir: str = "config", output_dir: str = "data/invoices"):
+        """
+        Inizializza il generatore PDF.
+        
+        Args:
+            config_dir: Directory per i file di configurazione
+            output_dir: Directory per i PDF generati
+            
+        Crea:
+        - Stili del documento
+        - Directory necessarie
+        - Carica configurazione aziendale
+        
+        Possibili miglioramenti:
+        - Aggiungere supporto per template multipli
+        - Implementare cache dei loghi
+        - Supportare più formati di output
+        """
         self.config_dir = Path(config_dir)
         self.output_dir = Path(output_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -32,14 +55,24 @@ class PDFGenerator:
         self._setup_styles()
 
     def _ensure_directories(self):
-        """Ensure output directory exists"""
+        """Assicura che le directory necessarie esistano"""
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _load_company_details(self) -> dict:
-        """Load company details from configuration"""
+        """
+        Carica i dettagli dell'azienda dalla configurazione.
+        
+        Returns:
+            dict: Dettagli dell'azienda
+            
+        Possibili miglioramenti:
+        - Aggiungere validazione dei dati
+        - Supportare più profili aziendali
+        - Implementare backup automatico
+        """
         config_file = self.config_dir / "settings.json"
         if not config_file.exists():
-            # Create default config if it doesn't exist
+            # Crea configurazione predefinita se non esiste
             default_config = {
                 "company_name": "Pension Flora",
                 "address": "",
@@ -58,7 +91,7 @@ class PDFGenerator:
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Extract company details from settings.json structure
+                # Estrae i dettagli dalla struttura di settings.json
                 return {
                     "company_name": data.get("company_name", ""),
                     "address": data.get("address", ""),
@@ -73,11 +106,38 @@ class PDFGenerator:
         except json.JSONDecodeError:
             return {}
 
+    def reload_company_details(self):
+        """
+        Ricarica i dettagli dell'azienda dal file di configurazione.
+        
+        Utile quando i dettagli vengono modificati dall'interfaccia.
+        
+        Possibili miglioramenti:
+        - Aggiungere notifica di cambiamenti
+        - Implementare ricaricamento automatico
+        - Validare i nuovi dati
+        """
+        self.company_details = self._load_company_details()
+
     def _setup_styles(self):
-        """Setup document styles"""
+        """
+        Configura gli stili del documento PDF.
+        
+        Crea stili per:
+        - Titolo principale
+        - Nome azienda
+        - Numero ricevuta
+        - Testo normale
+        - Totali
+        
+        Possibili miglioramenti:
+        - Aggiungere più temi colore
+        - Supportare font personalizzati
+        - Implementare stili responsivi
+        """
         styles = getSampleStyleSheet()
         
-        # Main title style (RICEVUTA)
+        # Stile titolo principale (RICEVUTA)
         self.main_title_style = ParagraphStyle(
             'MainTitle',
             parent=styles['Heading1'],
@@ -87,7 +147,7 @@ class PDFGenerator:
             textColor=colors.HexColor('#000000')
         )
         
-        # Company name style
+        # Stile nome azienda
         self.company_name_style = ParagraphStyle(
             'CompanyName',
             parent=styles['Heading2'],
@@ -96,7 +156,7 @@ class PDFGenerator:
             alignment=TA_LEFT
         )
         
-        # Invoice number style
+        # Stile numero ricevuta
         self.invoice_number_style = ParagraphStyle(
             'InvoiceNumber',
             parent=styles['Heading2'],
@@ -105,7 +165,7 @@ class PDFGenerator:
             alignment=TA_RIGHT
         )
         
-        # Normal text style
+        # Stile testo normale
         self.normal_style = ParagraphStyle(
             'CustomNormal',
             parent=styles['Normal'],
@@ -114,7 +174,7 @@ class PDFGenerator:
             alignment=TA_LEFT
         )
         
-        # Right-aligned text style
+        # Stile testo allineato a destra
         self.right_style = ParagraphStyle(
             'RightAligned',
             parent=styles['Normal'],
@@ -123,7 +183,7 @@ class PDFGenerator:
             alignment=TA_RIGHT
         )
         
-        # Section title style
+        # Stile titolo sezione
         self.section_title_style = ParagraphStyle(
             'SectionTitle',
             parent=styles['Heading3'],
@@ -133,7 +193,7 @@ class PDFGenerator:
             alignment=TA_LEFT
         )
         
-        # Total style
+        # Stile totale
         self.total_style = ParagraphStyle(
             'CustomTotal',
             parent=styles['Normal'],
@@ -143,39 +203,52 @@ class PDFGenerator:
         )
 
     def _create_header(self, invoice: Invoice) -> list:
-        """Create modern two-column header with logo"""
+        """
+        Crea l'intestazione moderna a due colonne.
+        
+        Args:
+            invoice: Ricevuta da processare
+            
+        Returns:
+            list: Elementi dell'intestazione
+            
+        Possibili miglioramenti:
+        - Aggiungere più layout di intestazione
+        - Supportare immagini di sfondo
+        - Implementare codici QR
+        """
         elements = []
         
-        # Main title
+        # Titolo principale
         elements.extend([
             Paragraph("RICEVUTA", self.main_title_style),
             Spacer(1, 10)
         ])
         
-        # Create two-column header
-        # Left column: Company info (and logo when available)
+        # Crea intestazione a due colonne
+        # Colonna sinistra: Info azienda (e logo se disponibile)
         left_column = []
         
-        # Add logo if exists
+        # Aggiunge il logo se esiste
         logo_path = self.config_dir / "logo.png"
         if logo_path.exists():
             try:
                 logo = Image(str(logo_path))
-                # Scale logo to reasonable size (adjust as needed)
+                # Scala il logo a dimensioni ragionevoli
                 logo.drawHeight = 2*cm
                 logo.drawWidth = 4*cm
                 left_column.append(logo)
                 left_column.append(Spacer(1, 10))
             except:
-                pass  # Skip logo if there's an error
+                pass  # Ignora errori del logo
         
-        # Company details
+        # Dettagli azienda
         if self.company_details.get('company_name'):
             left_column.extend([
                 Paragraph(f"<b>{self.company_details['company_name']}</b>", self.company_name_style)
             ])
             
-            # Add address
+            # Aggiunge indirizzo
             address_parts = []
             if self.company_details.get('address'):
                 address_parts.append(self.company_details['address'])
@@ -191,7 +264,7 @@ class PDFGenerator:
                     Paragraph(", ".join(filter(None, address_parts)), self.normal_style)
                 )
             
-            # Add tax details
+            # Aggiunge dettagli fiscali
             if self.company_details.get('vat_number'):
                 left_column.append(
                     Paragraph(f"P.IVA: {self.company_details['vat_number']}", self.normal_style)
@@ -201,7 +274,7 @@ class PDFGenerator:
                     Paragraph(f"SDI: {self.company_details['sdi']}", self.normal_style)
                 )
             
-            # Add contact info
+            # Aggiunge contatti
             if self.company_details.get('phone'):
                 left_column.append(
                     Paragraph(f"Tel: {self.company_details['phone']}", self.normal_style)
@@ -211,14 +284,14 @@ class PDFGenerator:
                     Paragraph(f"Email: {self.company_details['email']}", self.normal_style)
                 )
         
-        # Right column: Invoice details
+        # Colonna destra: Dettagli ricevuta
         right_column = [
             Paragraph(f"N° {invoice.invoice_number}", self.invoice_number_style),
             Paragraph(f"Data: {invoice.date.strftime('%d/%m/%Y')}", self.right_style),
             Spacer(1, 10)
         ]
         
-        # Create table for two-column layout
+        # Crea tabella per layout a due colonne
         header_table = Table(
             [[left_column, right_column]], 
             colWidths=[12*cm, 6*cm],
@@ -231,12 +304,12 @@ class PDFGenerator:
         elements.append(header_table)
         elements.append(Spacer(1, 20))
         
-        # Customer section
+        # Sezione cliente
         if invoice.customer_name:
             elements.append(Paragraph("CLIENTE", self.section_title_style))
             customer_info = []
             
-            # Add customer details
+            # Aggiunge dettagli cliente
             customer_info.append(Paragraph(invoice.customer_name, self.normal_style))
             if invoice.customer_street:
                 customer_info.append(Paragraph(invoice.customer_street, self.normal_style))
@@ -249,15 +322,28 @@ class PDFGenerator:
             
             elements.extend(customer_info)
             elements.append(Spacer(1, 20))
-        
+            
         return elements
 
     def _create_items_table(self, invoice: Invoice) -> Table:
-        """Create items table with modern styling"""
-        # Table header
+        """
+        Crea la tabella degli articoli con stile moderno.
+        
+        Args:
+            invoice: Ricevuta da processare
+            
+        Returns:
+            Table: Tabella degli articoli formattata
+            
+        Possibili miglioramenti:
+        - Aggiungere stili alternati per le righe
+        - Implementare subtotali per gruppi
+        - Aggiungere colonne personalizzabili
+        """
+        # Intestazione tabella
         data = [['Descrizione', 'Quantità', 'Prezzo', 'Totale']]
         
-        # Add items
+        # Aggiunge articoli
         for item in invoice.items:
             data.append([
                 item.description,
@@ -266,37 +352,50 @@ class PDFGenerator:
                 f"€ {item.total:.2f}"
             ])
         
-        # Create table
+        # Crea tabella
         table = Table(data, colWidths=[9*cm, 3*cm, 3*cm, 3*cm])
         
-        # Modern table style
+        # Stile moderno tabella
         style = TableStyle([
-            # Alignment
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),  # Description left aligned
-            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),  # Numbers right aligned
+            # Allineamento
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),  # Descrizione allineata a sinistra
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),  # Numeri allineati a destra
             
-            # Font styles
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Header bold
+            # Stili font
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Intestazione in grassetto
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             
-            # Spacing
+            # Spaziatura
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             
-            # Grid
+            # Griglia
             ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
-            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Thicker header bottom line
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Linea più spessa sotto l'intestazione
         ])
         table.setStyle(style)
         
         return table
 
     def _create_footer(self, invoice: Invoice) -> list:
-        """Create footer with centered total"""
+        """
+        Crea il piè di pagina con totale centrato.
+        
+        Args:
+            invoice: Ricevuta da processare
+            
+        Returns:
+            list: Elementi del piè di pagina
+            
+        Possibili miglioramenti:
+        - Aggiungere note di piè di pagina
+        - Implementare termini e condizioni
+        - Aggiungere QR code per pagamenti
+        """
         elements = [Spacer(1, 20)]
         
-        # Add total in a table for better alignment
+        # Aggiunge totale in una tabella per miglior allineamento
         total_table = Table(
             [[Paragraph(f"<b>Totale: € {invoice.total_amount:.2f}</b>", self.total_style)]],
             colWidths=[18*cm],
@@ -308,7 +407,7 @@ class PDFGenerator:
         )
         elements.append(total_table)
         
-        # Add payment details if available
+        # Aggiunge dettagli pagamento se disponibili
         if self.company_details.get('billing_number'):
             elements.extend([
                 Spacer(1, 20),
@@ -319,11 +418,25 @@ class PDFGenerator:
         return elements
 
     def generate_pdf(self, invoice: Invoice) -> Path:
-        """Generate PDF for the given invoice"""
-        # Create PDF file path
+        """
+        Genera il PDF per la ricevuta specificata.
+        
+        Args:
+            invoice: Ricevuta da processare
+            
+        Returns:
+            Path: Percorso del file PDF generato
+            
+        Possibili miglioramenti:
+        - Aggiungere watermark
+        - Implementare firme digitali
+        - Supportare più template
+        - Aggiungere anteprima PDF
+        """
+        # Crea percorso file PDF
         pdf_path = self.output_dir / f"{invoice.invoice_number}.pdf"
         
-        # Create PDF document
+        # Crea documento PDF
         doc = SimpleDocTemplate(
             str(pdf_path),
             pagesize=A4,
@@ -333,19 +446,19 @@ class PDFGenerator:
             bottomMargin=2*cm
         )
         
-        # Build document content
+        # Costruisce il contenuto del documento
         elements = []
         
-        # Add header
+        # Aggiunge intestazione
         elements.extend(self._create_header(invoice))
         
-        # Add items table
+        # Aggiunge tabella articoli
         elements.append(self._create_items_table(invoice))
         
-        # Add footer
+        # Aggiunge piè di pagina
         elements.extend(self._create_footer(invoice))
         
-        # Generate PDF
+        # Genera PDF
         doc.build(elements)
         
         return pdf_path 

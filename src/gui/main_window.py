@@ -1,5 +1,17 @@
 """
-Main Window - Primary application window and entry point
+Finestra Principale - Gestisce l'interfaccia principale dell'applicazione
+
+Questo modulo contiene la classe MainWindow che è responsabile di:
+1. Visualizzare e gestire la lista delle ricevute
+2. Permettere la creazione e modifica delle ricevute
+3. Gestire l'ordinamento e la ricerca
+4. Coordinare tutte le operazioni principali
+
+Possibili miglioramenti:
+- Aggiungere supporto per temi personalizzati
+- Implementare la possibilità di personalizzare le colonne visibili
+- Aggiungere grafici e statistiche
+- Implementare filtri avanzati per la ricerca
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -18,61 +30,78 @@ from .invoice_manager import InvoiceManagerDialog
 from ..models.invoice import Invoice
 
 class MainWindow:
-    """Main application window"""
+    """Finestra principale dell'applicazione"""
     
     def __init__(self):
+        """
+        Inizializza la finestra principale.
+        
+        Crea:
+        - La finestra root con Tkinter
+        - I manager per la gestione dei dati
+        - L'interfaccia utente principale
+        - Il sistema di ordinamento
+        
+        Possibili miglioramenti:
+        - Salvare e caricare le dimensioni della finestra
+        - Aggiungere supporto per monitor multipli
+        - Implementare un sistema di temi
+        """
+        # Inizializza la finestra principale
         self.root = tk.Tk()
         self.root.title("Ricevute - Pension Flora")
         
-        # Configure message box font and style
+        # Configura il font per i messaggi di dialogo
         self.root.option_add('*Dialog.msg.font', 'Helvetica 10')
         self.root.option_add('*Dialog.msg.wrapLength', '300')
         
-        # Get screen dimensions
+        # Calcola le dimensioni della finestra in base alla risoluzione dello schermo
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         
-        # Calculate window size based on screen resolution
-        # For HD (1920x1080) to 4K (3840x2160)
-        width_ratio = min(max(screen_width / 1920, 1.0), 2.0)  # Scale between 1x and 2x
+        # Calcola il rapporto di scala per schermi ad alta risoluzione
+        width_ratio = min(max(screen_width / 1920, 1.0), 2.0)  # Scala tra 1x e 2x
         height_ratio = min(max(screen_height / 1080, 1.0), 2.0)
         
-        # Base sizes for HD resolution
+        # Dimensioni base per risoluzione HD
         base_width = 1400
         base_height = 900
         
-        # Calculate window size
+        # Calcola le dimensioni effettive della finestra
         window_width = int(base_width * width_ratio)
         window_height = int(base_height * height_ratio)
         
-        # Calculate font sizes
+        # Calcola le dimensioni dei font
         self.normal_font_size = int(9 * width_ratio)
         self.header_font_size = int(12 * width_ratio)
         
-        # Center window on screen
+        # Centra la finestra sullo schermo
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
-        # Configure font scaling
+        # Configura i font
         self.default_font = ('Helvetica', self.normal_font_size)
         self.header_font = ('Helvetica', self.header_font_size, 'bold')
         
-        # Initialize managers
-        self.counter_manager = CounterManager()
-        self.storage_manager = StorageManager()
-        self.pdf_generator = PDFGenerator()
+        # Inizializza i manager per la gestione dei dati
+        self.counter_manager = CounterManager()  # Gestisce la numerazione delle ricevute
+        self.storage_manager = StorageManager()  # Gestisce il salvataggio e caricamento
+        self.pdf_generator = PDFGenerator()      # Gestisce la generazione dei PDF
         
-        # Initialize UI components
-        self.current_invoice: Optional[Invoice] = None
-        self.sort_order = "desc"
-        self.setup_menu()
-        self.setup_main_frame()
-        self.setup_shortcuts()
-        self.load_invoice_history()
+        # Inizializza le variabili di stato
+        self.current_invoice: Optional[Invoice] = None  # Ricevuta correntemente in modifica
+        self.sort_column = 'date'    # Colonna per l'ordinamento (default: data)
+        self.sort_order = "desc"     # Ordine di ordinamento (default: decrescente)
         
-        # Bind resize event
+        # Configura l'interfaccia
+        self.setup_menu()            # Crea il menu principale
+        self.setup_main_frame()      # Crea il layout principale
+        self.setup_shortcuts()       # Configura le scorciatoie da tastiera
+        self.load_invoice_history()  # Carica la lista delle ricevute
+        
+        # Gestisce il ridimensionamento della finestra
         self.root.bind('<Configure>', self.on_window_resize)
         
     def on_window_resize(self, event):
@@ -141,65 +170,74 @@ class MainWindow:
         self.invoice_form = InvoiceForm(self.right_frame, self.counter_manager)
         
     def setup_history_view(self):
-        """Setup the invoice history view"""
-        # History header frame
+        """
+        Configura la vista della cronologia delle ricevute.
+        
+        Crea:
+        - Intestazione con titolo
+        - Campo di ricerca
+        - Tabella delle ricevute con colonne ordinabili
+        - Barra di scorrimento
+        
+        Possibili miglioramenti:
+        - Aggiungere filtri avanzati
+        - Permettere la personalizzazione delle colonne
+        - Aggiungere preview delle ricevute al passaggio del mouse
+        - Implementare la selezione multipla
+        """
+        # Frame per l'intestazione
         header_frame = ttk.Frame(self.left_frame)
         header_frame.pack(fill=tk.X, pady=(0, 5))
         
-        # History label and sort button in the same row
+        # Etichetta del titolo
         history_label = ttk.Label(header_frame, text="Cronologia Ricevute", font=self.header_font)
         history_label.pack(side=tk.LEFT, pady=(0, 5))
         
-        self.sort_button = ttk.Button(
-            header_frame,
-            text="↓ Data",  # Start with descending order
-            width=8,
-            command=self.toggle_sort_order
-        )
-        self.sort_button.pack(side=tk.RIGHT, padx=5)
-        
-        # Search frame
+        # Frame per la ricerca
         search_frame = ttk.Frame(self.left_frame)
         search_frame.pack(fill=tk.X, pady=(0, 5))
         
+        # Campo di ricerca con etichetta
         ttk.Label(search_frame, text="Cerca:", font=self.default_font).pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
-        self.search_var.trace('w', self.filter_history)
+        self.search_var.trace('w', self.filter_history)  # Aggiorna la lista durante la digitazione
         search_entry = ttk.Entry(search_frame, textvariable=self.search_var, font=self.default_font)
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        # Treeview style for larger fonts
+        # Configura lo stile della tabella
         style = ttk.Style()
         style.configure("Treeview", font=self.default_font)
         style.configure("Treeview.Heading", font=self.default_font)
         
-        # Treeview for history
+        # Crea la tabella delle ricevute
         columns = ('number', 'date', 'customer', 'amount')
         self.history_tree = ttk.Treeview(self.left_frame, columns=columns, show='headings', style="Treeview")
         
-        # Setup columns with proportional widths
+        # Calcola le larghezze delle colonne
         window_width = self.root.winfo_width()
         history_width = window_width // 3
         
-        self.history_tree.heading('number', text='Numero')
-        self.history_tree.heading('date', text='Data')
-        self.history_tree.heading('customer', text='Cliente')
-        self.history_tree.heading('amount', text='Importo')
+        # Configura le intestazioni delle colonne con funzionalità di ordinamento
+        self.history_tree.heading('number', text='Numero', command=lambda: self.sort_history('number'))
+        self.history_tree.heading('date', text='Data', command=lambda: self.sort_history('date'))
+        self.history_tree.heading('customer', text='Cliente', command=lambda: self.sort_history('customer'))
+        self.history_tree.heading('amount', text='Importo', command=lambda: self.sort_history('amount'))
         
+        # Imposta le larghezze delle colonne
         self.history_tree.column('number', width=int(history_width * 0.2))
         self.history_tree.column('date', width=int(history_width * 0.2))
         self.history_tree.column('customer', width=int(history_width * 0.4))
         self.history_tree.column('amount', width=int(history_width * 0.2))
         
-        # Add scrollbar
+        # Aggiunge la barra di scorrimento
         scrollbar = ttk.Scrollbar(self.left_frame, orient=tk.VERTICAL, command=self.history_tree.yview)
         self.history_tree.configure(yscrollcommand=scrollbar.set)
         
-        # Pack history view
+        # Posiziona la tabella e la barra di scorrimento
         self.history_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Bind double-click
+        # Configura il doppio click per aprire una ricevuta
         self.history_tree.bind('<Double-1>', self.load_selected_invoice)
         
     def setup_shortcuts(self):
@@ -215,19 +253,28 @@ class MainWindow:
         self.root.bind('<F1>', lambda e: self.show_about())
         
     def load_invoice_history(self):
-        """Load invoice history into the treeview"""
-        # Clear existing items
+        """
+        Carica la cronologia delle ricevute nella tabella.
+        
+        Operazioni:
+        1. Pulisce la tabella esistente
+        2. Carica tutte le ricevute dal gestore
+        3. Inserisce le ricevute nella tabella
+        4. Applica l'ordinamento iniziale
+        
+        Possibili miglioramenti:
+        - Implementare il caricamento paginato per grandi dataset
+        - Aggiungere una barra di progresso per il caricamento
+        - Implementare il caricamento asincrono
+        """
+        # Pulisce la tabella
         for item in self.history_tree.get_children():
             self.history_tree.delete(item)
-            
-        # Load invoices
+        
+        # Carica le ricevute dal gestore
         invoices = self.storage_manager.load_all_invoices()
         
-        # Sort by date (newest first by default)
-        reverse = self.sort_order == "desc"
-        invoices.sort(key=lambda x: x.date, reverse=reverse)
-        
-        # Add to treeview
+        # Inserisce le ricevute nella tabella
         for invoice in invoices:
             self.history_tree.insert('', 'end', values=(
                 invoice.invoice_number,
@@ -235,7 +282,11 @@ class MainWindow:
                 invoice.customer_name or '',
                 f"€ {invoice.total_amount:.2f}"
             ))
-            
+        
+        # Applica l'ordinamento iniziale per data (più recenti prima)
+        self.sort_history('date')
+        self._last_sort = ('date', True)
+        
     def filter_history(self, *args):
         """Filter history based on search text"""
         search_text = self.search_var.get().lower()
@@ -360,12 +411,67 @@ class MainWindow:
         """Show success message"""
         CustomMessageBox.showerror("Successo", message)
         
-    def toggle_sort_order(self):
-        """Toggle between ascending and descending sort order"""
-        self.sort_order = "asc" if self.sort_order == "desc" else "desc"
-        self.sort_button.configure(text="↑ Data" if self.sort_order == "asc" else "↓ Data")
-        self.load_invoice_history()
+    def sort_history(self, column):
+        """
+        Ordina la cronologia delle ricevute in base alla colonna selezionata.
         
+        Args:
+            column (str): Nome della colonna su cui ordinare
+        
+        Funzionamento:
+        - Primo click: ordine crescente
+        - Secondo click: ordine decrescente
+        - Click su colonna diversa: ordine crescente
+        
+        Possibili miglioramenti:
+        - Aggiungere ordinamento per più colonne
+        - Salvare l'ultimo ordinamento utilizzato
+        - Aggiungere animazioni durante l'ordinamento
+        """
+        # Ottiene tutti gli elementi dalla tabella
+        items = [(self.history_tree.set(item, column), item) for item in self.history_tree.get_children('')]
+        
+        # Gestisce l'inversione dell'ordine se si clicca la stessa colonna
+        if hasattr(self, '_last_sort') and self._last_sort == (column, False):
+            items.sort(reverse=True)
+            self._last_sort = (column, True)
+            arrow = "↑"  # Freccia per ordine crescente
+        else:
+            items.sort(reverse=False)
+            self._last_sort = (column, False)
+            arrow = "↓"  # Freccia per ordine decrescente
+        
+        # Riposiziona gli elementi nella tabella secondo il nuovo ordine
+        for index, (val, item) in enumerate(items):
+            self.history_tree.move(item, '', index)
+        
+        # Nomi delle colonne per l'interfaccia
+        column_names = {
+            'number': 'Numero',
+            'date': 'Data',
+            'customer': 'Cliente',
+            'amount': 'Importo'
+        }
+        
+        # Aggiorna le intestazioni delle colonne
+        for col in column_names:
+            if col == column:
+                # Aggiunge la freccia alla colonna ordinata
+                self.history_tree.heading(col, text=f"{column_names[col]} {arrow}")
+            else:
+                # Ripristina le altre colonne senza freccia
+                self.history_tree.heading(col, text=column_names[col])
+
+    def get_column_name(self, column):
+        """Get the display name for a column"""
+        column_names = {
+            'number': 'Numero',
+            'date': 'Data',
+            'customer': 'Cliente',
+            'amount': 'Importo'
+        }
+        return column_names[column]
+
     def open_invoice_manager(self):
         """Open the invoice manager dialog"""
         InvoiceManagerDialog(self.root)
