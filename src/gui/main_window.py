@@ -164,88 +164,49 @@ class MainWindow:
         self.root.bind('<<Save>>', lambda e: self.save_invoice())
         
     def setup_history_view(self):
-        """
-        Configure the invoice history view with search and sorting
+        """Set up the invoice history view"""
+        # Initialize sorting state
+        self.sort_column = None
+        self.sort_ascending = True
         
-        Components:
-        1. Header with title
-        2. Search field with real-time filtering
-        3. Sortable table with columns:
-           - Number (invoice number)
-           - Date (invoice date)
-           - Customer (customer name)
-           - Amount (invoice total)
-        4. Scrollbar for navigation
-        
-        Features:
-        - Real-time search filtering
-        - Click column headers to sort
-        - Double-click row to load invoice
-        - Responsive column widths
-        
-        Example:
-            # Default sort by date
-            self.sort_history('date')
-            
-            # Search for customer
-            self.search_var.set("John")  # Filters list automatically
-            
-        To modify column widths:
-        ```python
-        # Adjust column proportions
-        widths = {
-            'number': 0.15,    # 15% for number
-            'date': 0.20,      # 20% for date
-            'customer': 0.45,  # 45% for customer
-            'amount': 0.20     # 20% for amount
-        }
-        for col, width in widths.items():
-            self.history_tree.column(col, width=int(history_width * width))
-        ```
-        """
-        # Create header with title
         header_frame = ttk.Frame(self.left_frame)
         header_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        # Add title label
         history_label = ttk.Label(header_frame, text="Invoice History", font=self.header_font)
-        history_label.pack(side=tk.LEFT, pady=(0, 5))
+        history_label.pack(side=tk.LEFT)
         
-        # Create search frame
         search_frame = ttk.Frame(self.left_frame)
         search_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        # Add search field with label
-        ttk.Label(search_frame, text="Search:", font=self.default_font).pack(side=tk.LEFT)
+        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
-        self.search_var.trace('w', self.filter_history)  # Real-time filtering
+        self.search_var.trace('w', self.filter_history)
         search_entry = ttk.Entry(search_frame, textvariable=self.search_var, font=self.default_font)
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        # Configure table style for consistency
         style = ttk.Style()
         style.configure("Treeview", font=self.default_font)
         style.configure("Treeview.Heading", font=self.default_font)
         
-        # Create invoice table with sortable columns
-        columns = ('number', 'date', 'customer', 'amount')
+        # Add notes column to the history table
+        columns = ('number', 'date', 'customer', 'amount', 'notes')
         self.history_tree = ttk.Treeview(self.left_frame, columns=columns, show='headings', style="Treeview")
         
         # Calculate initial column widths
         window_width = self.root.winfo_width()
         history_width = window_width // 3
         
-        # Configure sortable column headers
+        # Configure sortable column headers with commands
         self.history_tree.heading('number', text='Number', command=lambda: self.sort_history('number'))
         self.history_tree.heading('date', text='Date', command=lambda: self.sort_history('date'))
         self.history_tree.heading('customer', text='Customer', command=lambda: self.sort_history('customer'))
         self.history_tree.heading('amount', text='Amount', command=lambda: self.sort_history('amount'))
+        self.history_tree.heading('notes', text='Notes', command=lambda: self.sort_history('notes'))
         
         # Set proportional column widths
-        self.history_tree.column('number', width=int(history_width * 0.2))   # 20% for number
-        self.history_tree.column('date', width=int(history_width * 0.2))     # 20% for date
-        self.history_tree.column('customer', width=int(history_width * 0.4))  # 40% for customer
-        self.history_tree.column('amount', width=int(history_width * 0.2))   # 20% for amount
+        self.history_tree.column('number', width=int(history_width * 0.15))
+        self.history_tree.column('date', width=int(history_width * 0.15))
+        self.history_tree.column('customer', width=int(history_width * 0.25))
+        self.history_tree.column('amount', width=int(history_width * 0.15))
+        self.history_tree.column('notes', width=int(history_width * 0.30))
         
         # Add scrollbar for navigation
         scrollbar = ttk.Scrollbar(self.left_frame, orient=tk.VERTICAL, command=self.history_tree.yview)
@@ -342,7 +303,7 @@ class MainWindow:
             # Clear existing items
             for item in self.history_tree.get_children():
                 self.history_tree.delete(item)
-            
+                
             # Load all invoices
             invoices = self.storage_manager.load_all_invoices()
             
@@ -352,14 +313,16 @@ class MainWindow:
                     invoice.invoice_number,
                     invoice.date.strftime('%d/%m/%Y') if invoice.date else '',
                     invoice.customer_name or '',
-                    f"€ {invoice.total_amount:.2f}" if invoice.total_amount else '€ 0.00'
+                    f"€ {invoice.total_amount:.2f}" if invoice.total_amount else '€ 0.00',
+                    invoice.notes or ''  # Add notes to the display
                 ))
                 
+            # Maintain sort if active
+            if self.sort_column:
+                self.sort_history(self.sort_column)
+                
         except Exception as e:
-            messagebox.showerror(
-                "Error",
-                f"Failed to load invoice history: {str(e)}"
-            )
+            CustomMessageBox.showerror("Error", f"Failed to load invoice history: {str(e)}")
 
     def update_invoice_history(self, invoices):
         """Update invoice history display"""
@@ -377,42 +340,47 @@ class MainWindow:
             ))
 
     def sort_history(self, column):
-        """
-        Sort the history table by the specified column
-        
-        Args:
-            column (str): Column to sort by ('number', 'date', 'customer', 'amount')
-            
-        Features:
-        - Toggles between ascending and descending
-        - Maintains sort state between refreshes
-        - Handles different data types appropriately
-        
-        Example:
-            # Sort by date descending
-            self.sort_history('date')
-            
-            # Toggle to ascending
-            self.sort_history('date')
-            
-        Sort Behavior:
-        - Number: Numeric sort
-        - Date: Chronological sort
-        - Customer: Case-insensitive text sort
-        - Amount: Numeric sort (strips currency symbol)
-        """
-        # Update sort state
+        """Sort the history table by the specified column"""
         if self.sort_column == column:
-            # Toggle sort order if same column
-            self.sort_order = "asc" if self.sort_order == "desc" else "desc"
+            self.sort_ascending = not self.sort_ascending
         else:
-            # Default to descending for new column
             self.sort_column = column
-            self.sort_order = "desc"
+            self.sort_ascending = True
             
-        # Reload with new sort
-        self.load_invoice_history()
+        # Get all items
+        items = [(self.history_tree.set(item, column), item) 
+                for item in self.history_tree.get_children('')]
         
+        # Sort based on column type
+        if column == 'number':
+            # Numeric sort for invoice numbers
+            items.sort(key=lambda x: int(x[0]), reverse=not self.sort_ascending)
+        elif column == 'date':
+            # Date sort
+            items.sort(key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'),
+                      reverse=not self.sort_ascending)
+        elif column == 'amount':
+            # Amount sort
+            items.sort(key=lambda x: float(x[0].replace('€', '').strip()),
+                      reverse=not self.sort_ascending)
+        else:
+            # Text sort for customer and notes
+            items.sort(key=lambda x: x[0].lower(), reverse=not self.sort_ascending)
+        
+        # Rearrange items
+        for index, (_, item) in enumerate(items):
+            self.history_tree.move(item, '', index)
+            
+        # Update column headers - clear all arrows first
+        for col in self.history_tree['columns']:
+            text = col.capitalize()
+            self.history_tree.heading(col, text=text)
+            
+        # Add arrow to sorted column
+        arrow = "▼" if self.sort_ascending else "▲"
+        current_text = column.capitalize()
+        self.history_tree.heading(column, text=f"{current_text} {arrow}")
+
     def sort_invoices(self, invoices):
         """
         Sort list of invoices based on current sort settings
@@ -457,53 +425,27 @@ class MainWindow:
         invoices.sort(key=key, reverse=reverse)
         
     def filter_history(self, *args):
-        """
-        Filter history table based on search text
-        
-        Features:
-        - Real-time filtering as user types
-        - Case-insensitive search
-        - Searches all columns
-        - Maintains current sort order
-        
-        Search Rules:
-        - Matches are case-insensitive
-        - Partial matches are included
-        - Matches in any column are shown
-        - Empty search shows all items
-        
-        Example:
-            # Filter by customer name
-            self.search_var.set("john")  # Shows all entries containing "john"
-            
-            # Clear filter
-            self.search_var.set("")  # Shows all entries
-            
-        To modify search behavior:
-        ```python
-        # Exact match only
-        if search_text.lower() == str(value).lower():
-            self.history_tree.reattach(item, '', 'end')
-            
-        # Search specific columns only
-        searchable_columns = ['customer', 'number']
-        if any(search_text.lower() in str(values[col]).lower() 
-               for col in searchable_columns):
-            self.history_tree.reattach(item, '', 'end')
-        ```
-        """
+        """Filter invoice history based on search text"""
         search_text = self.search_var.get().lower()
         
-        # Hide all items initially
-        items = self.history_tree.get_children('')
-        for item in items:
-            self.history_tree.detach(item)
-            
-        # Show matching items
-        for item in items:
-            values = self.history_tree.item(item)['values']
-            if any(search_text in str(value).lower() for value in values):
-                self.history_tree.reattach(item, '', 'end')
+        # Store current selection
+        selection = self.history_tree.selection()
+        
+        # Reload all invoices
+        self.load_invoice_history()
+        
+        # Apply filter if search text exists
+        if search_text:
+            for item in self.history_tree.get_children():
+                values = self.history_tree.item(item)['values']
+                if not any(search_text in str(value).lower() 
+                          for value in values):
+                    self.history_tree.delete(item)
+                    
+        # Restore selection if items still exist
+        for item in selection:
+            if self.history_tree.exists(item):
+                self.history_tree.selection_add(item)
                 
     def load_selected_invoice(self, event):
         """

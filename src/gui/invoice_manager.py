@@ -106,6 +106,15 @@ class InvoiceManagerDialog:
     - Efficient data handling
     """
     
+    # Column configuration
+    COLUMN_CONFIG = {
+        'number': {'text': 'Number', 'width': 100},
+        'date': {'text': 'Date', 'width': 100},
+        'customer': {'text': 'Customer', 'width': 200},
+        'amount': {'text': 'Amount', 'width': 100},
+        'notes': {'text': 'Notes', 'width': 250}
+    }
+    
     def __init__(self, parent: tk.Tk):
         """
         Initialize the invoice management dialog
@@ -142,6 +151,10 @@ class InvoiceManagerDialog:
             # - Modal (blocks parent)
             # - Populated with data
         """
+        # Initialize sorting state
+        self.sort_column = 'number'
+        self.sort_ascending = True
+        
         # Create modal dialog
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Invoice Manager")
@@ -232,7 +245,7 @@ class InvoiceManagerDialog:
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         # Configure table columns
-        columns = ('number', 'date', 'customer', 'amount')
+        columns = ('number', 'date', 'customer', 'amount', 'notes')
         self.invoice_tree = ttk.Treeview(
             main_frame,
             columns=columns,
@@ -241,15 +254,12 @@ class InvoiceManagerDialog:
         )
         
         # Set column headings and widths
-        column_config = {
-            'number': {'text': 'Number', 'width': 150},
-            'date': {'text': 'Date', 'width': 100},
-            'customer': {'text': 'Customer', 'width': 300},
-            'amount': {'text': 'Amount', 'width': 100}
-        }
-        
-        for col, config in column_config.items():
-            self.invoice_tree.heading(col, text=config['text'])
+        for col, config in self.COLUMN_CONFIG.items():
+            self.invoice_tree.heading(
+                col, 
+                text=config['text'],
+                command=lambda c=col: self.sort_invoices_by(c)
+            )
             self.invoice_tree.column(col, width=config['width'])
         
         # Add scrollbar for navigation
@@ -289,6 +299,43 @@ class InvoiceManagerDialog:
         
         # Load initial data
         self.load_invoices()
+        
+    def sort_invoices_by(self, column: str):
+        """Sort invoices by the specified column"""
+        if self.sort_column == column:
+            self.sort_ascending = not self.sort_ascending
+        else:
+            self.sort_column = column
+            self.sort_ascending = True
+            
+        # Get all items
+        items = [(self.invoice_tree.set(item, column), item) 
+                for item in self.invoice_tree.get_children('')]
+        
+        # Sort based on column type
+        if column in ('number', 'amount'):
+            # Numeric sort
+            items.sort(key=lambda x: float(x[0].replace('€', '').strip()), 
+                      reverse=not self.sort_ascending)
+        elif column == 'date':
+            # Date sort
+            items.sort(key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'),
+                      reverse=not self.sort_ascending)
+        else:
+            # Text sort
+            items.sort(key=lambda x: x[0].lower(),
+                      reverse=not self.sort_ascending)
+        
+        # Rearrange items
+        for index, (_, item) in enumerate(items):
+            self.invoice_tree.move(item, '', index)
+            
+        # Update column header
+        for col in self.invoice_tree['columns']:
+            self.invoice_tree.heading(col, text=self.COLUMN_CONFIG[col]['text'])
+        arrow = "▼" if self.sort_ascending else "▲"
+        current_text = self.COLUMN_CONFIG[column]['text']
+        self.invoice_tree.heading(column, text=f"{current_text} {arrow}")
         
     def load_invoices(self):
         """
@@ -336,7 +383,8 @@ class InvoiceManagerDialog:
                     invoice.invoice_number,
                     invoice.date.strftime('%d/%m/%Y'),
                     invoice.customer_name or '',
-                    f"€ {invoice.total_amount:.2f}"
+                    f"€ {invoice.total_amount:.2f}",
+                    invoice.notes or ''
                 )
                 self.invoice_tree.insert('', 'end', values=values)
                 

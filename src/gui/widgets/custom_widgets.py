@@ -41,8 +41,20 @@ class ItemsTable(ttk.Frame):
         
     def create_table(self):
         """Create the items table"""
+        # Create toolbar frame
+        toolbar_frame = ttk.Frame(self)
+        toolbar_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # Add delete button
+        self.delete_btn = ttk.Button(
+            toolbar_frame,
+            text="Delete Selected",
+            command=self.delete_selected_items
+        )
+        self.delete_btn.pack(side=tk.LEFT)
+        
         columns = ('description', 'quantity', 'price', 'total')
-        self.tree = ttk.Treeview(self, columns=columns, show='headings')
+        self.tree = ttk.Treeview(self, columns=columns, show='headings', selectmode='extended')
         
         # Setup columns
         self.tree.heading('description', text='Descrizione')
@@ -63,6 +75,35 @@ class ItemsTable(ttk.Frame):
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # Bind delete key
+        self.tree.bind('<Delete>', lambda e: self.delete_selected_items())
+        
+    def delete_selected_items(self):
+        """Delete selected items from the table"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+            
+        if not messagebox.askyesno("Confirm", "Delete selected items?"):
+            return
+            
+        try:
+            # Update total by subtracting deleted items
+            for item in selection:
+                values = self.tree.item(item)['values']
+                total = Decimal(str(values[3]))  # Convert to Decimal safely
+                self._total -= total
+                self.tree.delete(item)
+                
+            # Notify of total change
+            self._notify_total_changed()
+            
+        except (InvalidOperation, IndexError) as e:
+            messagebox.showerror(
+                "Error",
+                f"Failed to delete items: {str(e)}"
+            )
+        
     def add_item(self, description: str, quantity: Decimal, price: Decimal, total: Optional[Decimal] = None):
         """Add a new item to the table"""
         if total is None:
@@ -79,54 +120,33 @@ class ItemsTable(ttk.Frame):
         self._total += total
         self._notify_total_changed()
         
-    def delete_selected(self):
-        """Delete selected items"""
-        selected = self.tree.selection()
-        if not selected:
-            return
-            
-        if messagebox.askyesno("Conferma", "Eliminare gli elementi selezionati?"):
-            for item_id in selected:
-                values = self.tree.item(item_id)['values']
-                self._total -= Decimal(str(values[3]))  # Subtract item total
-                self.tree.delete(item_id)
-            self._notify_total_changed()
-            
-    def clear(self):
-        """Clear all items"""
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        self._total = Decimal('0')
-        self._notify_total_changed()
+    def _notify_total_changed(self):
+        """Notify parent of total change"""
+        self.event_generate('<<TotalChanged>>')
         
     def get_items(self) -> List[Dict]:
         """Get all items as list of dictionaries"""
         items = []
         for item in self.tree.get_children():
             values = self.tree.item(item)['values']
-            quantity = Decimal(str(values[1]))
-            price = Decimal(str(values[2]))
-            total = Decimal(str(values[3]))
             items.append({
                 'description': values[0],
-                'quantity': quantity,
-                'price': price,
-                'total': total
+                'quantity': Decimal(str(values[1])),
+                'price': Decimal(str(values[2])),
+                'total': Decimal(str(values[3]))
             })
         return items
         
-    def _notify_total_changed(self):
-        """Notify total change to parent widgets"""
-        event = tk.Event()
-        event.widget = self
-        event.total = self._total
-        self.event_generate('<<TotalUpdated>>')
-        if self.master:
-            self.master.event_generate('<<TotalUpdated>>')
-            
     def get_total(self) -> Decimal:
         """Get current total"""
         return self._total
+        
+    def clear(self):
+        """Clear all items from the table"""
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        self._total = Decimal('0')
+        self._notify_total_changed()
 
 class TotalDisplay(ttk.Frame):
     """Display for invoice total"""

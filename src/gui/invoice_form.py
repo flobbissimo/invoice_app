@@ -553,6 +553,13 @@ class InvoiceForm:
             text="Add Item",
             command=self.add_item
         ).pack(side=tk.LEFT, padx=self.padx)
+
+        # Remove item button
+        ttk.Button(
+            input_frame,
+            text="Remove Item",
+            command=self.remove_selected_item
+        ).pack(side=tk.LEFT, padx=self.padx)
         
         # Create total display
         total_frame = ttk.Frame(items_frame)
@@ -947,3 +954,71 @@ class InvoiceForm:
         except ValueError as e:
             messagebox.showerror("Validation Error", str(e))
             return False
+        
+    def save_invoice(self):
+        """Save the current invoice"""
+        try:
+            # Get customer details
+            invoice_data = {
+                'invoice_number': self.customer_fields['invoice_number'].get().strip(),
+                'date': parse_date(self.customer_fields['date'].get()),
+                'customer_name': self.customer_fields['customer_name'].get().strip(),
+                'customer_vat': self.customer_fields['customer_vat'].get().strip(),
+                'customer_sdi': self.customer_fields['customer_sdi'].get().strip(),
+                'customer_street': self.customer_fields['customer_street'].get().strip(),
+                'customer_email': self.customer_fields['customer_email'].get().strip(),
+                'notes': self.notes_text.get('1.0', tk.END).strip()  # Get notes content
+            }
+            
+            # Validate required fields
+            if not invoice_data['invoice_number']:
+                raise ValueError("Invoice number is required")
+                
+            # Get items
+            items = []
+            for item in self.items_tree.get_children():
+                values = self.items_tree.item(item)['values']
+                items.append(InvoiceItem(
+                    description=values[0],
+                    quantity=Decimal(str(values[1])),
+                    price=Decimal(str(values[2].replace('€', '').strip())),
+                    total=Decimal(str(values[3].replace('€', '').strip()))
+                ))
+                
+            if not items:
+                raise ValueError("At least one item is required")
+                
+            # Create invoice object
+            invoice = Invoice(
+                invoice_number=invoice_data['invoice_number'],
+                date=invoice_data['date'],
+                customer_name=invoice_data['customer_name'],
+                customer_vat=invoice_data['customer_vat'],
+                customer_sdi=invoice_data['customer_sdi'],
+                customer_street=invoice_data['customer_street'],
+                customer_email=invoice_data['customer_email'],
+                items=items,
+                notes=invoice_data['notes']  # Include notes
+            )
+            
+            # Save invoice
+            self.storage_manager.save_invoice(invoice)
+            
+            # Generate PDF
+            pdf_path = self.pdf_generator.generate_pdf(invoice)
+            
+            # Show success message
+            CustomMessageBox.showinfo(
+                "Success",
+                f"Invoice saved successfully\nPDF generated: {pdf_path}"
+            )
+            
+            # Update invoice history
+            self.event_generate('<<InvoiceSaved>>')
+            
+            return invoice
+            
+        except ValueError as e:
+            CustomMessageBox.showerror("Validation Error", str(e))
+        except Exception as e:
+            CustomMessageBox.showerror("Error", f"Failed to save invoice: {str(e)}")
