@@ -39,6 +39,7 @@ logs/
 data/
 config/*.json
 !config/default.json
+o1 version/
 
 # Environment variables
 .env

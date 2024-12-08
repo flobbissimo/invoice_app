@@ -1,16 +1,55 @@
 """
 Storage Manager - Handles invoice data persistence and management
 
-This module provides the StorageManager class which is responsible for:
-1. Storing and retrieving invoice data in JSON format
-2. Managing automatic backups of invoices
-3. Providing search functionality across invoices
-4. Handling file system operations for the application
+Key Features:
+1. Thread-safe invoice storage and retrieval
+2. Automatic backup system with versioning
+3. High-performance search with indexing
+4. Batch operations support
+5. Error recovery mechanisms
 
-Performance optimizations:
-- Implements LRU cache for frequently accessed invoices
-- Lazy loading of invoice data
-- Index-based search for faster queries
+Components:
+- File Storage: JSON-based persistence
+- Search Index: In-memory for fast queries
+- Backup System: Versioned backups
+- Cache: LRU cache for frequent access
+
+Technical Details:
+- Uses file-based locking for thread safety
+- Implements background indexing
+- Manages concurrent access
+- Handles file system operations
+- Provides data validation
+
+Performance Optimizations:
+- LRU cache for frequently accessed invoices
+- Background indexing for faster searches
+- Batch loading for large datasets
+- Efficient file operations
+- Memory-efficient data structures
+
+Error Handling:
+- Automatic backup before modifications
+- Recovery from corrupted files
+- Validation of data integrity
+- Graceful degradation
+- Detailed error reporting
+
+Usage Example:
+    # Initialize manager
+    manager = StorageManager()
+    
+    # Save invoice
+    manager.save_invoice(invoice)
+    
+    # Load with caching
+    invoice = manager.load_invoice("INV-001")
+    
+    # Search with index
+    results = manager.search_invoices("customer name")
+    
+    # Batch operations
+    invoices = manager.load_all_invoices()
 """
 import json
 import shutil

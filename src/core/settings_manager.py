@@ -1,5 +1,63 @@
 """
 Settings Manager - Handles application configuration
+
+Key Features:
+1. Hierarchical settings management
+2. Default value handling
+3. Type-safe configuration
+4. Company details management
+5. Path configuration
+
+Components:
+- Settings Storage: JSON-based persistence
+- Company Details: Separate configuration
+- Default Values: Fallback settings
+- Path Management: Directory structure
+
+Technical Details:
+- Uses JSON for settings storage
+- Implements deep dictionary merging
+- Manages configuration hierarchy
+- Handles file system operations
+- Provides type validation
+
+Configuration Categories:
+1. Company Details:
+   - Company name and address
+   - Tax information (VAT, SDI)
+   - Contact details
+   - Billing information
+
+2. PDF Settings:
+   - Font configuration
+   - Page layout
+   - Margins and spacing
+   - Template options
+
+3. Application Settings:
+   - Language preferences
+   - Theme selection
+   - Backup configuration
+   - System integration
+
+4. Path Configuration:
+   - Data directory
+   - Config location
+   - Backup storage
+   - Template files
+
+Usage Example:
+    # Initialize manager
+    settings = SettingsManager()
+    
+    # Get specific setting
+    value = settings.get_setting('company_details', 'name')
+    
+    # Update setting
+    settings.set_setting('pdf_settings', 'font_size', 12)
+    
+    # Get company details
+    company = settings.get_company_details()
 """
 import json
 from pathlib import Path

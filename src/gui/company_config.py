@@ -1,29 +1,68 @@
 """
-Company Configuration Dialog
+Company Configuration Dialog - Manages company details and settings
 
-This dialog allows you to configure your company details that will appear on the invoices.
-To modify your company details:
-1. Press Ctrl+C to open this configuration window
-2. Fill in the desired fields:
-   - Company Name (required)
+Key Features:
+1. Company details management
+2. Field validation
+3. Settings persistence
+4. Configuration reload
+5. Modal dialog
+
+Components:
+1. Basic Information:
+   - Company name
+   - Address details
+   - Contact information
+   - Tax identifiers
+
+2. Business Details:
+   - VAT number
+   - SDI code
+   - Bank details
+   - Additional info
+
+3. Contact Information:
+   - Phone numbers
+   - Email addresses
+   - Website
+   - Social media
+
+Technical Details:
+- Uses ttk widgets for native look
+- Implements input validation
+- Manages configuration files
+- Handles data persistence
+- Provides error feedback
+
+Validation Rules:
+1. Required Fields:
+   - Company name
    - Address
-   - Postal Code
-   - City
-   - Country
-   - VAT Number
-   - SDI Code (Codice Destinatario SDI)
-   - Phone
-   - Email
-   - IBAN
-3. Click Save to apply the changes
-4. Changes will be immediately reflected in new PDFs
+   - VAT number
 
-Note: To modify your SDI code:
-1. Press Ctrl+C
-2. Find the "SDI:" field
-3. Enter your 7-character SDI code
-4. Click Save
-5. The new SDI will appear on all new invoices
+2. Format Validation:
+   - Valid VAT format
+   - SDI code (7 chars)
+   - Email format
+   - Phone format
+
+3. Business Rules:
+   - Valid tax codes
+   - Complete address
+   - Contact details
+
+Usage Example:
+    # Create dialog
+    dialog = CompanyConfigDialog(
+        parent,
+        on_config_saved=reload_callback
+    )
+    
+    # Dialog provides:
+    # - Company details form
+    # - Validation feedback
+    # - Auto-save feature
+    # - Configuration reload
 """
 import tkinter as tk
 from tkinter import ttk

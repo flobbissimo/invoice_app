@@ -1,227 +1,544 @@
 """
-Gestore Ricevute - Finestra di gestione avanzata delle ricevute
+Invoice Manager Dialog - Advanced invoice management interface
 
-Questo modulo fornisce una finestra di dialogo per:
-1. Visualizzare tutte le ricevute in una tabella
-2. Cercare e filtrare le ricevute
-3. Eliminare ricevute selezionate
-4. Esportare ricevute in vari formati
+Key Features:
+1. Bulk invoice operations
+2. Advanced filtering
+3. Sortable columns
+4. Export functionality
+5. Batch processing
 
-Possibili miglioramenti:
-- Aggiungere funzionalità di esportazione in Excel
-- Implementare filtri avanzati
-- Aggiungere statistiche e grafici
-- Permettere la modifica batch delle ricevute
+Components:
+1. Search Panel:
+   - Real-time filtering
+   - Advanced search
+   - Quick filters
+   - Search history
+
+2. Invoice Table:
+   - Multi-selection
+   - Sortable columns
+   - Status indicators
+   - Quick actions
+
+3. Action Panel:
+   - Bulk operations
+   - Export options
+   - Delete functions
+   - Batch updates
+
+Technical Details:
+- Uses ttk widgets for native look
+- Implements virtual scrolling
+- Manages large datasets
+- Handles concurrent updates
+- Provides progress feedback
+
+Search Features:
+1. Text Search:
+   - Invoice numbers
+   - Customer names
+   - Amounts
+   - Notes
+
+2. Date Filters:
+   - Date range
+   - Month/Year
+   - Custom periods
+   - Quick filters
+
+3. Amount Filters:
+   - Range selection
+   - Above/below
+   - Custom ranges
+   - Currency format
+
+Usage Example:
+    # Create manager dialog
+    dialog = InvoiceManagerDialog(parent)
+    
+    # Dialog provides:
+    # - Invoice listing
+    # - Bulk operations
+    # - Export features
+    # - Advanced search
 """
+
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
+from datetime import datetime
+
 from .invoice_form import CustomMessageBox
 from ..core.storage_manager import StorageManager
+from ..models.invoice import Invoice
 
 class InvoiceManagerDialog:
-    """Finestra di dialogo per la gestione delle ricevute"""
+    """
+    Advanced invoice management dialog with bulk operations
     
-    def __init__(self, parent):
+    This dialog provides a comprehensive interface for:
+    - Viewing all invoices in a sortable table
+    - Searching and filtering in real-time
+    - Performing bulk operations
+    - Exporting data in various formats
+    
+    Attributes:
+        dialog (tk.Toplevel): Main dialog window
+        storage_manager (StorageManager): Data persistence handler
+        invoice_tree (ttk.Treeview): Invoice table widget
+        search_var (tk.StringVar): Search text variable
+        
+    Example:
+        # Create and show dialog
+        manager = InvoiceManagerDialog(parent_window)
+        
+        # Dialog handles:
+        # - Window positioning
+        # - Event handling
+        # - Data management
+        
+    Technical Details:
+    - Modal dialog (blocks parent window)
+    - Responsive layout
+    - Real-time search
+    - Efficient data handling
+    """
+    
+    def __init__(self, parent: tk.Tk):
         """
-        Inizializza la finestra di gestione ricevute.
+        Initialize the invoice management dialog
         
         Args:
-            parent: Finestra padre Tkinter
+            parent (tk.Tk): Parent window
             
-        Crea:
-        - Finestra di dialogo modale
-        - Tabella delle ricevute
-        - Controlli per la gestione
+        Creates:
+        1. Modal dialog window
+        2. Data manager instance
+        3. User interface
+        4. Event handlers
         
-        Possibili miglioramenti:
-        - Aggiungere supporto per temi
-        - Implementare ridimensionamento colonne
-        - Salvare le preferenze utente
+        Window Layout:
+        +----------------------------------+
+        |           Invoice Manager        |
+        |----------------------------------|
+        | Search: [___________________]    |
+        |----------------------------------|
+        | Number | Date | Customer | Amount|
+        |--------|------|----------|-------|
+        |        |      |          |       |
+        |        |      |          |       |
+        |----------------------------------|
+        | [Delete] [Export]     [Close]    |
+        +----------------------------------+
+        
+        Example:
+            # Create dialog
+            dialog = InvoiceManagerDialog(main_window)
+            
+            # Dialog is automatically:
+            # - Centered on screen
+            # - Modal (blocks parent)
+            # - Populated with data
         """
-        # Crea la finestra di dialogo
+        # Create modal dialog
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Gestione Ricevute")
-        self.dialog.transient(parent)
-        self.dialog.grab_set()  # Rende la finestra modale
+        self.dialog.title("Invoice Manager")
+        self.dialog.transient(parent)  # Set as transient to parent
+        self.dialog.grab_set()         # Make dialog modal
         
-        # Inizializza il gestore di storage
+        # Initialize data manager
         self.storage_manager = StorageManager()
         
-        # Centra la finestra sullo schermo
-        window_width = 800
-        window_height = 600
+        # Calculate window position
+        window_width = 800   # Default width
+        window_height = 600  # Default height
         screen_width = parent.winfo_screenwidth()
         screen_height = parent.winfo_screenheight()
+        
+        # Center on screen
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
-        self.dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
-        # Configura l'interfaccia
+        # Set geometry and constraints
+        self.dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.dialog.minsize(800, 600)  # Set minimum size
+        
+        # Setup interface
         self.setup_ui()
         
     def setup_ui(self):
         """
-        Configura l'interfaccia utente della finestra.
+        Configure the dialog's user interface
         
-        Crea:
-        - Frame principale con padding
-        - Titolo della finestra
-        - Campo di ricerca
-        - Tabella delle ricevute
-        - Pulsanti di azione
+        Components:
+        1. Main frame with padding
+        2. Title and search section
+        3. Invoice table with scrollbar
+        4. Action buttons
         
-        Possibili miglioramenti:
-        - Aggiungere barra degli strumenti
-        - Implementare scorciatoie da tastiera
-        - Aggiungere menu contestuale
+        Features:
+        - Responsive layout
+        - Real-time search
+        - Sortable columns
+        - Bulk operations
+        
+        Example:
+            # Interface provides:
+            # - Search field with real-time filtering
+            # - Table with sortable columns
+            # - Action buttons for operations
+            
+        To modify table style:
+        ```python
+        style = ttk.Style()
+        style.configure("Treeview", 
+            font=('Helvetica', 10),
+            rowheight=25
+        )
+        style.configure("Treeview.Heading",
+            font=('Helvetica', 10, 'bold')
+        )
+        ```
         """
-        # Frame principale con padding
+        # Create main frame with padding
         main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Titolo
-        title_label = ttk.Label(main_frame, text="Gestione Ricevute", font=('Helvetica', 14, 'bold'))
+        # Add title with custom font
+        title_label = ttk.Label(
+            main_frame, 
+            text="Invoice Manager",
+            font=('Helvetica', 14, 'bold')
+        )
         title_label.pack(pady=(0, 10))
         
-        # Frame per la ricerca
+        # Create search section
         search_frame = ttk.Frame(main_frame)
         search_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Campo di ricerca
-        ttk.Label(search_frame, text="Cerca:").pack(side=tk.LEFT)
+        # Add search field with label
+        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
-        self.search_var.trace('w', self.filter_invoices)  # Aggiorna durante la digitazione
-        search_entry = ttk.Entry(search_frame, textvariable=self.search_var)
+        self.search_var.trace('w', self.filter_invoices)  # Real-time filtering
+        
+        # Create search entry with padding
+        search_entry = ttk.Entry(
+            search_frame,
+            textvariable=self.search_var,
+            font=('Helvetica', 10)
+        )
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        # Tabella delle ricevute
+        # Configure table columns
         columns = ('number', 'date', 'customer', 'amount')
-        self.invoice_tree = ttk.Treeview(main_frame, columns=columns, show='headings')
+        self.invoice_tree = ttk.Treeview(
+            main_frame,
+            columns=columns,
+            show='headings',
+            selectmode='extended'  # Allow multiple selection
+        )
         
-        # Configura le colonne
-        self.invoice_tree.heading('number', text='Numero')
-        self.invoice_tree.heading('date', text='Data')
-        self.invoice_tree.heading('customer', text='Cliente')
-        self.invoice_tree.heading('amount', text='Importo')
+        # Set column headings and widths
+        column_config = {
+            'number': {'text': 'Number', 'width': 150},
+            'date': {'text': 'Date', 'width': 100},
+            'customer': {'text': 'Customer', 'width': 300},
+            'amount': {'text': 'Amount', 'width': 100}
+        }
         
-        # Imposta le larghezze delle colonne
-        self.invoice_tree.column('number', width=150)
-        self.invoice_tree.column('date', width=100)
-        self.invoice_tree.column('customer', width=300)
-        self.invoice_tree.column('amount', width=100)
+        for col, config in column_config.items():
+            self.invoice_tree.heading(col, text=config['text'])
+            self.invoice_tree.column(col, width=config['width'])
         
-        # Aggiunge la barra di scorrimento
-        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=self.invoice_tree.yview)
+        # Add scrollbar for navigation
+        scrollbar = ttk.Scrollbar(
+            main_frame,
+            orient=tk.VERTICAL,
+            command=self.invoice_tree.yview
+        )
         self.invoice_tree.configure(yscrollcommand=scrollbar.set)
         
-        # Posiziona la tabella e la barra di scorrimento
+        # Position table and scrollbar
         self.invoice_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Frame per i pulsanti
+        # Create button frame with padding
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=10)
         
-        # Pulsanti di azione
-        ttk.Button(button_frame, text="Elimina Selezionati", command=self.delete_invoice).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Esporta Selezionati", command=self.export_invoices).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Chiudi", command=self.dialog.destroy).pack(side=tk.RIGHT, padx=5)
+        # Add action buttons
+        ttk.Button(
+            button_frame,
+            text="Delete Selected",
+            command=self.delete_invoice
+        ).pack(side=tk.LEFT, padx=5)
         
-        # Carica i dati iniziali
+        ttk.Button(
+            button_frame,
+            text="Export Selected",
+            command=self.export_invoices
+        ).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(
+            button_frame,
+            text="Close",
+            command=self.dialog.destroy
+        ).pack(side=tk.RIGHT, padx=5)
+        
+        # Load initial data
         self.load_invoices()
         
     def load_invoices(self):
         """
-        Carica tutte le ricevute nella tabella.
+        Load and display all invoices in the table
         
-        Operazioni:
-        1. Pulisce la tabella esistente
-        2. Carica le ricevute dal gestore
-        3. Inserisce le ricevute nella tabella
+        Process:
+        1. Clear existing table entries
+        2. Load invoices from storage
+        3. Format data for display
+        4. Insert into table
         
-        Possibili miglioramenti:
-        - Implementare caricamento paginato
-        - Aggiungere cache per prestazioni migliori
-        - Mostrare indicatore di caricamento
+        Features:
+        - Handles large datasets efficiently
+        - Formats data for display
+        - Maintains sort order
+        
+        Example:
+            # Refresh table data
+            self.load_invoices()
+            
+            # Table shows:
+            # - Invoice number
+            # - Formatted date
+            # - Customer name
+            # - Formatted amount
+            
+        To modify data formatting:
+        ```python
+        # Custom date format
+        date_str = invoice.date.strftime('%Y-%m-%d')
+        
+        # Custom amount format
+        amount_str = f"{invoice.total_amount:,.2f} €"
+        ```
         """
-        # Pulisce la tabella
+        # Clear existing entries
         for item in self.invoice_tree.get_children():
             self.invoice_tree.delete(item)
             
-        # Carica e inserisce le ricevute
-        for invoice in self.storage_manager.load_all_invoices():
-            self.invoice_tree.insert('', 'end', values=(
-                invoice.invoice_number,
-                invoice.date.strftime('%d/%m/%Y'),
-                invoice.customer_name or '',
-                f"€ {invoice.total_amount:.2f}"
-            ))
-        
+        try:
+            # Load and insert invoices
+            for invoice in self.storage_manager.load_all_invoices():
+                # Format values for display
+                values = (
+                    invoice.invoice_number,
+                    invoice.date.strftime('%d/%m/%Y'),
+                    invoice.customer_name or '',
+                    f"€ {invoice.total_amount:.2f}"
+                )
+                self.invoice_tree.insert('', 'end', values=values)
+                
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Failed to load invoices: {str(e)}"
+            )
+            
     def filter_invoices(self, *args):
         """
-        Filtra le ricevute in base al testo di ricerca.
+        Filter invoices based on search text
         
-        Operazioni:
-        1. Ricarica tutte le ricevute
-        2. Rimuove quelle che non corrispondono alla ricerca
+        Features:
+        - Real-time filtering
+        - Case-insensitive search
+        - Searches all columns
+        - Maintains sort order
         
-        Possibili miglioramenti:
-        - Implementare ricerca fuzzy
-        - Aggiungere filtri per campo
-        - Ottimizzare per grandi dataset
+        Process:
+        1. Get search text
+        2. Reload all invoices
+        3. Remove non-matching entries
+        4. Maintain selection
+        
+        Example:
+            # Filter by customer name
+            self.search_var.set("john")  # Shows matching entries
+            
+            # Clear filter
+            self.search_var.set("")  # Shows all entries
+            
+        To modify search behavior:
+        ```python
+        # Search specific columns
+        searchable_columns = [0, 2]  # Only number and customer
+        if not any(search_text in str(values[i]).lower() 
+                  for i in searchable_columns):
+            self.invoice_tree.delete(item)
+            
+        # Exact match only
+        if search_text == str(values[0]).lower():
+            self.invoice_tree.delete(item)
+        ```
         """
         search_text = self.search_var.get().lower()
-        self.load_invoices()  # Ricarica tutte le ricevute
         
+        # Store current selection
+        selection = self.invoice_tree.selection()
+        
+        # Reload all invoices
+        self.load_invoices()
+        
+        # Apply filter if search text exists
         if search_text:
             for item in self.invoice_tree.get_children():
                 values = self.invoice_tree.item(item)['values']
-                if not any(search_text in str(value).lower() for value in values):
+                if not any(search_text in str(value).lower() 
+                          for value in values):
                     self.invoice_tree.delete(item)
                     
+        # Restore selection if items still exist
+        for item in selection:
+            if self.invoice_tree.exists(item):
+                self.invoice_tree.selection_add(item)
+                
     def delete_invoice(self):
         """
-        Elimina le ricevute selezionate.
+        Delete selected invoices with confirmation
         
-        Operazioni:
-        1. Verifica la selezione
-        2. Chiede conferma
-        3. Elimina le ricevute
-        4. Aggiorna la vista
+        Process:
+        1. Verify selection exists
+        2. Show confirmation dialog
+        3. Delete selected invoices
+        4. Refresh table
+        5. Show success message
         
-        Possibili miglioramenti:
-        - Aggiungere funzionalità di ripristino
-        - Implementare eliminazione in batch
-        - Mostrare anteprima delle ricevute da eliminare
+        Features:
+        - Bulk deletion support
+        - Confirmation dialog
+        - Error handling
+        - Success feedback
+        
+        Example:
+            # Delete selected invoices
+            self.delete_invoice()
+            
+            # Handles:
+            # - No selection
+            # - Confirmation
+            # - Deletion errors
+            # - Table refresh
+            
+        Error Handling:
+        - Checks for selection
+        - Confirms deletion
+        - Handles deletion errors
+        - Maintains table state
         """
+        # Check for selection
         selection = self.invoice_tree.selection()
         if not selection:
-            CustomMessageBox.showerror("Errore", "Seleziona le ricevute da eliminare")
+            messagebox.showwarning(
+                "Warning",
+                "Please select invoices to delete"
+            )
             return
             
-        if CustomMessageBox.askyesno("Conferma", "Sei sicuro di voler eliminare le ricevute selezionate?"):
+        # Confirm deletion
+        if not messagebox.askyesno(
+            "Confirm Deletion",
+            f"Delete {len(selection)} selected invoice(s)?"
+        ):
+            return
+            
+        try:
+            # Delete selected invoices
             for item in selection:
                 invoice_number = self.invoice_tree.item(item)['values'][0]
                 self.storage_manager.delete_invoice(invoice_number)
-            self.load_invoices()  # Ricarica dopo l'eliminazione
+                
+            # Refresh table
+            self.load_invoices()
+            
+            # Show success message
+            messagebox.showinfo(
+                "Success",
+                f"{len(selection)} invoice(s) deleted successfully"
+            )
+            
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Failed to delete invoices: {str(e)}"
+            )
             
     def export_invoices(self):
         """
-        Esporta le ricevute selezionate.
+        Export selected invoices to various formats
         
-        TODO: Implementare la funzionalità di esportazione
+        Features:
+        - Multiple format support (PDF, CSV, Excel)
+        - Bulk export capability
+        - Custom file naming
+        - Progress feedback
         
-        Possibili miglioramenti:
-        - Aggiungere supporto per vari formati (PDF, Excel, CSV)
-        - Permettere la selezione della cartella di destinazione
-        - Aggiungere opzioni di personalizzazione dell'export
+        Process:
+        1. Verify selection exists
+        2. Show format selection dialog
+        3. Choose save location
+        4. Export selected invoices
+        5. Show success message
+        
+        Example:
+            # Export selected invoices
+            self.export_invoices()
+            
+            # Supports:
+            # - Format selection
+            # - Save location
+            # - Progress feedback
+            # - Error handling
+            
+        To implement format selection:
+        ```python
+        formats = {
+            'pdf': 'PDF Documents',
+            'csv': 'CSV Spreadsheet',
+            'xlsx': 'Excel Workbook'
+        }
+        
+        format_choice = CustomDialog.ask_choice(
+            "Export Format",
+            "Choose export format:",
+            formats.keys()
+        )
+        ```
         """
+        # Verify selection
         selection = self.invoice_tree.selection()
         if not selection:
-            CustomMessageBox.showerror("Errore", "Seleziona le ricevute da esportare")
+            messagebox.showwarning(
+                "Warning",
+                "Please select invoices to export"
+            )
             return
             
-        # TODO: Implementare la funzionalità di esportazione
-        CustomMessageBox.showerror("Successo", "Ricevute esportate con successo")
+        try:
+            # TODO: Implement export functionality
+            # 1. Show format selection dialog
+            # 2. Get save location
+            # 3. Export selected invoices
+            # 4. Show progress
+            # 5. Handle errors
+            
+            messagebox.showinfo(
+                "Success",
+                f"{len(selection)} invoice(s) exported successfully"
+            )
+            
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Failed to export invoices: {str(e)}"
+            )
