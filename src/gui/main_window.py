@@ -187,7 +187,7 @@ class MainWindow:
         style.configure("Treeview.Heading", font=self.default_font)
         
         # Add notes column to the history table
-        columns = ('number', 'date', 'customer', 'amount', 'notes')
+        columns = ('number', 'date', 'customer', 'amount') #'notes'
         self.history_tree = ttk.Treeview(self.left_frame, columns=columns, show='headings', style="Treeview")
         
         # Calculate initial column widths
@@ -199,14 +199,14 @@ class MainWindow:
         self.history_tree.heading('date', text='Date', command=lambda: self.sort_history('date'))
         self.history_tree.heading('customer', text='Customer', command=lambda: self.sort_history('customer'))
         self.history_tree.heading('amount', text='Amount', command=lambda: self.sort_history('amount'))
-        self.history_tree.heading('notes', text='Notes', command=lambda: self.sort_history('notes'))
+        #self.history_tree.heading('notes', text='Notes', command=lambda: self.sort_history('notes'))
         
         # Set proportional column widths
         self.history_tree.column('number', width=int(history_width * 0.15))
         self.history_tree.column('date', width=int(history_width * 0.15))
         self.history_tree.column('customer', width=int(history_width * 0.25))
         self.history_tree.column('amount', width=int(history_width * 0.15))
-        self.history_tree.column('notes', width=int(history_width * 0.30))
+        #self.history_tree.column('notes', width=int(history_width * 0.30))
         
         # Add scrollbar for navigation
         scrollbar = ttk.Scrollbar(self.left_frame, orient=tk.VERTICAL, command=self.history_tree.yview)
