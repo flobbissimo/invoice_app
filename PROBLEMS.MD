@@ -255,4 +255,72 @@ self.event_generate('<<TotalChanged>>')
 19. Implement internationalization support
 20. Add complete test coverage
 
-These additional issues should also be addressed in future updates to improve the overall system reliability and maintainability. 
+These additional issues should also be addressed in future updates to improve the overall system reliability and maintainability.
+
+## Additional Issues Found
+
+### Project Structure
+
+### Dependencies Management
+**Issue**: No explicit Python version requirement in requirements.txt or pyproject.toml.
+**Issue**: Dependencies versions are not pinned in requirements.txt, which could lead to compatibility issues.
+
+### Configuration Management
+**Issue**: Configuration files are scattered across different locations (config/, src/core/settings_manager.py).
+**Issue**: No environment-specific configuration handling (development vs production).
+
+### Invoice Manager (invoice_manager.py)
+```python
+# Invoice state management
+```
+**Issue**: No clear separation between UI state and business logic.
+**Issue**: Large file (592 lines) suggests potential violation of Single Responsibility Principle.
+
+### Main Window Size
+**Issue**: No persistent window size/position settings between sessions.
+**Issue**: No minimum window size constraints which could break layout on very small screens.
+
+### PDF Generator Improvements
+**Issue**: No progress feedback during PDF generation for large batches.
+**Issue**: Font embedding not handled explicitly, could cause rendering issues on different systems.
+
+### Data Validation
+**Issue**: No cross-field validation (e.g., end date must be after start date).
+**Issue**: No maximum length constraints on text input fields.
+
+### Error Recovery
+**Issue**: No automatic recovery mechanism for corrupted invoice files.
+**Issue**: No system for tracking and reporting application errors to developers.
+
+### Performance Considerations
+**Issue**: Large invoice histories are loaded entirely into memory.
+**Issue**: No pagination in invoice history view for large datasets.
+
+### Security
+**Issue**: No input sanitization for file paths and external data.
+**Issue**: PDF files are stored without encryption or access control.
+
+### Accessibility
+**Issue**: No keyboard navigation support for all features.
+**Issue**: No screen reader compatibility considerations.
+
+### Development Tools
+**Issue**: No pre-commit hooks for code quality checks.
+**Issue**: No automated code formatting configuration.
+
+### Testing Infrastructure
+**Issue**: No integration tests for PDF generation.
+**Issue**: No performance benchmarks for critical operations.
+
+## Future Considerations
+
+1. Implement data pagination for large datasets
+2. Add automated error reporting system
+3. Implement proper accessibility features
+4. Add comprehensive input validation
+5. Create development environment configuration
+6. Set up continuous integration pipeline
+7. Add performance monitoring
+8. Implement proper security measures
+9. Add proper window state management
+10. Create comprehensive test suite 

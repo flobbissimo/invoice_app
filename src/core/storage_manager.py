@@ -53,12 +53,15 @@ Usage Example:
 """
 import json
 import shutil
+import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from functools import lru_cache
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal, InvalidOperation
+import logging
 
 from ..models.invoice import Invoice
 
@@ -135,13 +138,132 @@ class StorageManager:
                 'notes': invoice.notes or ''
             }
 
+    def _calculate_numeric_hash(self, invoice_data: dict) -> str:
+        """Calculate SHA256 hash of all numerical values in the invoice"""
+        try:
+            # Create a string of all numerical values in a consistent order
+            numeric_values = []
+            
+            # Add invoice total and VAT
+            numeric_values.append(str(Decimal(invoice_data['total_amount'])))
+            numeric_values.append(str(Decimal(invoice_data['vat_amount'])))
+            
+            # Add all item values in a consistent order
+            for item in sorted(invoice_data['items'], key=lambda x: x['description']):
+                numeric_values.extend([
+                    str(Decimal(item['quantity'])),
+                    str(Decimal(item['price'])),
+                    str(Decimal(item['total']))
+                ])
+                
+            # Join all values and calculate hash
+            numeric_string = '|'.join(numeric_values)
+            return hashlib.sha256(numeric_string.encode()).hexdigest()
+            
+        except (InvalidOperation, KeyError, TypeError) as e:
+            logging.error(f"Error calculating numeric hash: {str(e)}")
+            return ""
+
+    def _validate_invoice_math(self, invoice_data: dict) -> Tuple[bool, str]:
+        """Validate mathematical consistency and return hash of numerical values"""
+        try:
+            # Calculate numeric hash first
+            numeric_hash = self._calculate_numeric_hash(invoice_data)
+            
+            # Validate each item's total
+            for item in invoice_data['items']:
+                quantity = Decimal(item['quantity'])
+                price = Decimal(item['price'])
+                total = Decimal(item['total'])
+                calculated_total = quantity * price
+                
+                if abs(calculated_total - total) > Decimal('0.01'):
+                    return False, numeric_hash
+            
+            # Validate invoice total
+            items_total = sum(Decimal(item['total']) for item in invoice_data['items'])
+            invoice_total = Decimal(invoice_data['total_amount'])
+            
+            if abs(items_total - invoice_total) > Decimal('0.01'):
+                return False, numeric_hash
+                
+            # Validate VAT calculation (22% in Italy)
+            vat = Decimal(invoice_data['vat_amount'])
+            calculated_vat = invoice_total * Decimal('0.22')
+            
+            if abs(vat - calculated_vat) > Decimal('0.01'):
+                return False, numeric_hash
+                
+            return True, numeric_hash
+            
+        except (InvalidOperation, KeyError, TypeError):
+            return False, ""
+
+    def _should_create_backup(self, current_data: dict, latest_backup: dict) -> bool:
+        """Determine if a new backup should be created based on numeric hash"""
+        if not latest_backup:
+            return True
+            
+        try:
+            # Calculate hashes for both current and backup data
+            current_hash = self._calculate_numeric_hash(current_data)
+            backup_hash = self._calculate_numeric_hash(latest_backup)
+            
+            # Create backup if hashes are different
+            return current_hash != backup_hash
+            
+        except Exception as e:
+            logging.error(f"Error comparing invoice data: {str(e)}")
+            return True  # Create backup if comparison fails
+
     def _create_backup(self, invoice_file: Path):
-        """Create a backup of the invoice file"""
-        backup_file = self.backup_dir / f"{invoice_file.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        shutil.copy2(invoice_file, backup_file)
-        
-        # Clean old backups in background
-        self._executor.submit(self._clean_old_backups, invoice_file.stem)
+        """Create a backup of the invoice file if needed"""
+        try:
+            # Read current invoice data
+            with open(invoice_file, 'r', encoding='utf-8') as f:
+                current_data = json.load(f)
+
+            # Validate mathematical consistency and get hash
+            is_valid, current_hash = self._validate_invoice_math(current_data)
+            if not is_valid:
+                logging.warning(f"Mathematical validation failed for invoice {invoice_file.stem}")
+                
+            # Store the hash in the invoice data for future reference
+            current_data['_numeric_hash'] = current_hash
+                
+            # Get latest backup
+            backup_files = sorted(
+                self.backup_dir.glob(f"{invoice_file.stem}_*.json"),
+                key=lambda x: x.stat().st_mtime,
+                reverse=True
+            )
+            
+            latest_backup = None
+            if backup_files:
+                try:
+                    with open(backup_files[0], 'r', encoding='utf-8') as f:
+                        latest_backup = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    pass
+            
+            # Only create backup if needed
+            if self._should_create_backup(current_data, latest_backup):
+                backup_file = self.backup_dir / f"{invoice_file.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                # Save the backup with the hash included
+                with open(backup_file, 'w', encoding='utf-8') as f:
+                    json.dump(current_data, f, indent=2)
+                logging.info(f"Created backup for invoice {invoice_file.stem} with hash {current_hash}")
+                
+                # Clean old backups in background
+                self._executor.submit(self._clean_old_backups, invoice_file.stem)
+            else:
+                logging.info(f"Skipped backup for invoice {invoice_file.stem} - No numeric changes detected")
+                
+        except Exception as e:
+            logging.error(f"Error during backup creation for {invoice_file.stem}: {str(e)}")
+            # Create backup anyway in case of error
+            backup_file = self.backup_dir / f"{invoice_file.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            shutil.copy2(invoice_file, backup_file)
 
     def _clean_old_backups(self, invoice_number: str, keep_latest: int = 5):
         """Clean old backup files, keeping only the specified number of latest backups"""
