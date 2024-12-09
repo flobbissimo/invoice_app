@@ -102,7 +102,8 @@ class PDFGenerator:
                 "vat_number": "",
                 "phone": "",
                 "email": "",
-                "billing_number": ""
+                "billing_number": "",
+                "sdi": ""
             }
             with open(config_file, 'w', encoding='utf-8') as f:
                 json.dump(default_config, f, indent=2, ensure_ascii=False)
@@ -121,7 +122,8 @@ class PDFGenerator:
                     "vat_number": data.get("vat_number", ""),
                     "phone": data.get("phone", ""),
                     "email": data.get("email", ""),
-                    "billing_number": data.get("billing_number", "")
+                    "billing_number": data.get("billing_number", ""),
+                    "sdi": data.get("sdi", "")
                 }
         except json.JSONDecodeError:
             return {}
@@ -245,12 +247,17 @@ class PDFGenerator:
         """
         elements = []
         
-        # Main title
+        # # Main title
+        # elements.extend([
+        #     Paragraph("RICEVUTA", self.main_title_style),
+        #     Spacer(1, 10)
+        # ])
+      
+        # Replace RICEVUTA with invoice number
         elements.extend([
-            Paragraph("RICEVUTA", self.main_title_style),
+            Paragraph(f"N° {invoice.invoice_number}", self.main_title_style),
             Spacer(1, 10)
-        ])
-        
+        ])        
         # Create two-column header
         # Left column: Company info (and logo if available)
         left_column = []
@@ -309,14 +316,13 @@ class PDFGenerator:
                 left_column.append(
                     Paragraph(f"Email: {self.company_details['email']}", self.normal_style)
                 )
+            
         
-        # Right column: Invoice details
+        # Right column: Invoice details (remove invoice number since it's now in the title)
         right_column = [
-            Paragraph(f"N° {invoice.invoice_number}", self.invoice_number_style),
             Paragraph(f"Data: {invoice.date.strftime('%d/%m/%Y')}", self.right_style),
             Spacer(1, 10)
         ]
-        
         # Create table for two-column layout
         header_table = Table(
             [[left_column, right_column]], 
